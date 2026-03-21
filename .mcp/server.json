@@ -1,0 +1,13 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
+  "description": "Remote MCP server for 3D AI Studio 3D generation, texturing, remeshing, image generation, and credit balance.",
+  "name": "local.workspace/3d-ai-studio-mcp",
+  "title": "3D AI Studio MCP",
+  "version": "0.1.0",
+  "remotes": [
+    {
+      "type": "http",
+      "url": "http://localhost:6281"
+    }
+  ]
+}
