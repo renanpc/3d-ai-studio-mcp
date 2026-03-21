@@ -1,3 +1,6 @@
 <Solution>
+  <Folder Name="/.github/">
+    <File Path=".github/workflows/release.yaml" />
+  </Folder>
   <Project Path="ThreeDAiStudioMcp.csproj" />
 </Solution>
