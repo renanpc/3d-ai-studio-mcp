@@ -1,6 +1,5 @@
 using System.Net.Http.Headers;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using ThreeDAiStudioMcp.Clients;
 using ThreeDAiStudioMcp.Configuration;
@@ -8,6 +7,8 @@ using ThreeDAiStudioMcp.Hosting;
 using ThreeDAiStudioMcp.Tools;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseWindowsService();
 
 builder.Services
     .AddOptions<ThreeDAiStudioOptions>()

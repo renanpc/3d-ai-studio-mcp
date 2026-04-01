@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+
+    <Package
+        Name="$(var.AppName)"
+        Version="$(var.Version)"
+        Manufacturer="$(var.Manufacturer)"
+        UpgradeCode="$(var.UpgradeCode)"
+        Scope="perMachine"
+        Compressed="yes">
+
+        <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+
+        <Feature Id="ProductFeature" Title="3D AI Studio MCP Server" Level="1">
+            <ComponentGroupRef Id="ProductComponents" />
+            <ComponentRef Id="ServiceComponent" />
+        </Feature>
+
+        <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+            <Component>
+                <File Source="$(var.SourcePath)\ThreeDAiStudioMcp.exe" />
+            </Component>
+        </ComponentGroup>
+
+        <Component Id="ServiceComponent" Guid="*" Directory="INSTALLFOLDER">
+            <util:ServiceInstall
+                Id="ThreeDAiStudioMcpService"
+                Name="ThreeDAiStudioMcp"
+                DisplayName="$(var.AppName)"
+                Description="Remote MCP server for 3D AI Studio"
+                Start="automatic"
+                Type="ownProcess"
+                ErrorControl="normal" />
+            <util:ServiceControl
+                Id="ThreeDAiStudioMcpServiceControl"
+                Name="ThreeDAiStudioMcp"
+                Start="install"
+                Stop="uninstall"
+                Remove="uninstall" />
+        </Component>
+
+        <StandardDirectory Id="ProgramFiles64Folder">
+            <Directory Id="INSTALLFOLDER" Name="$(var.AppName)">
+                <Component Id="InstallFolder" Guid="*">
+                    <CreateFolder />
+                    <RemoveFolder Id="RemoveInstallFolder" On="uninstall" />
+                </Component>
+            </Directory>
+        </StandardDirectory>
+
+        <LaunchConditions>
+            <Condition Message="This application requires a 64-bit Windows operating system.">
+                <![CDATA[VersionNT64 >= 10.0]]>
+            </Condition>
+        </LaunchConditions>
+    </Package>
+</Wix>
