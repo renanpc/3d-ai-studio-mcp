@@ -17,11 +17,12 @@
     <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
     <MediaTemplate EmbedCab="yes" />
 
-    <!-- This tells the standard InstallDir dialog which directory id is editable -->
+    <!-- InstallDir dialog uses this directory -->
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
 
-    <!-- Default port shown in the custom UI page -->
+    <!-- User-editable properties -->
     <Property Id="HTTPPORT" Value="8080" />
+    <Property Id="THREE_D_AI_STUDIO_API_KEY" Secure="yes" Hidden="yes" />
 
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="$(var.Name)">
@@ -50,37 +51,50 @@
                           Remove="uninstall"
                           Wait="yes" />
         </Component>
+
+        <Component Id="EnvComponent"
+                   Guid="8D8A4D5D-67C2-4D58-9B71-1A8E92D6E501"
+                   Bitness="always64">
+
+          <CreateFolder />
+
+          <Environment Id="ApiKeyEnv"
+                       Name="THREE_D_AI_STUDIO_API_KEY"
+                       Value="[THREE_D_AI_STUDIO_API_KEY]"
+                       Action="set"
+                       Part="all"
+                       System="yes" />
+        </Component>
+
+        <Component Id="RegComponent"
+                   Guid="F1B2C345-6789-0ABC-DEF1-234567890124"
+                   Bitness="always64">
+
+          <RegistryValue Root="HKLM"
+                         Key="Software\ThreeDAiStudio\McpServer"
+                         Name="InstallPath"
+                         Type="string"
+                         Value="[INSTALLFOLDER]"
+                         KeyPath="yes" />
+
+          <RegistryValue Root="HKLM"
+                         Key="Software\ThreeDAiStudio\McpServer"
+                         Name="HttpPort"
+                         Type="string"
+                         Value="[HTTPPORT]" />
+        </Component>
       </Directory>
     </StandardDirectory>
-
-    <Component Id="RegComponent"
-               Guid="F1B2C345-6789-0ABC-DEF1-234567890124"
-               Directory="INSTALLFOLDER"
-               Bitness="always64">
-
-      <RegistryValue Root="HKLM"
-                     Key="Software\ThreeDAiStudio\McpServer"
-                     Name="InstallPath"
-                     Type="string"
-                     Value="[INSTALLFOLDER]"
-                     KeyPath="yes" />
-
-      <RegistryValue Root="HKLM"
-                     Key="Software\ThreeDAiStudio\McpServer"
-                     Name="HttpPort"
-                     Type="string"
-                     Value="[HTTPPORT]" />
-    </Component>
 
     <Feature Id="Product"
              Title="$(var.Name)"
              Level="1">
       <ComponentRef Id="SvcExec" />
+      <ComponentRef Id="EnvComponent" />
       <ComponentRef Id="RegComponent" />
     </Feature>
 
-    <!-- Custom UI sequence with a Port dialog inserted before InstallDir -->
-    <UI Id="Custom_InstallDir_WithPort">
+    <UI Id="Custom_InstallDir_WithConfig">
 
       <TextStyle Id="WixUI_Font_Normal" FaceName="Tahoma" Size="8" />
       <TextStyle Id="WixUI_Font_Bigger" FaceName="Tahoma" Size="12" />
@@ -88,7 +102,6 @@
       <Property Id="DefaultUIFont" Value="WixUI_Font_Normal" />
       <Property Id="ARPNOMODIFY" Value="1" />
 
-      <!-- Standard dialogs from the WiX UI extension -->
       <DialogRef Id="BrowseDlg" />
       <DialogRef Id="DiskCostDlg" />
       <DialogRef Id="ErrorDlg" />
@@ -106,25 +119,33 @@
       <DialogRef Id="MaintenanceWelcomeDlg" />
       <DialogRef Id="MaintenanceTypeDlg" />
 
-      <!-- Custom port dialog -->
-      <Dialog Id="PortDlg" Width="370" Height="270" Title="[ProductName] Setup">
+      <Dialog Id="ConfigDlg" Width="370" Height="270" Title="[ProductName] Setup">
         <Control Id="Title" Type="Text" X="15" Y="6" Width="340" Height="15"
                  Transparent="yes" NoPrefix="yes"
                  Text="Service configuration" />
 
-        <Control Id="Description" Type="Text" X="20" Y="23" Width="330" Height="30"
+        <Control Id="Description" Type="Text" X="20" Y="23" Width="330" Height="28"
                  Transparent="yes" NoPrefix="yes"
-                 Text="Choose the HTTP port the 3D AI Studio MCP Server service will listen on." />
+                 Text="Choose the HTTP port and API key for the 3D AI Studio MCP Server service." />
 
-        <Control Id="PortLabel" Type="Text" X="20" Y="80" Width="80" Height="15"
+        <Control Id="PortLabel" Type="Text" X="20" Y="70" Width="100" Height="15"
                  Text="HTTP port:" />
-
-        <Control Id="PortEdit" Type="Edit" X="105" Y="78" Width="80" Height="18"
+        <Control Id="PortEdit" Type="Edit" X="125" Y="68" Width="90" Height="18"
                  Property="HTTPPORT" Integer="yes" />
 
-        <Control Id="PortHint" Type="Text" X="20" Y="102" Width="300" Height="25"
+        <Control Id="PortHint" Type="Text" X="20" Y="90" Width="300" Height="18"
                  Transparent="yes" NoPrefix="yes"
-                 Text="Default is 8080. Example: 8080, 8081, 9000." />
+                 Text="Default: 8080" />
+
+        <Control Id="ApiKeyLabel" Type="Text" X="20" Y="122" Width="220" Height="15"
+                 Text="THREE_D_AI_STUDIO_API_KEY:" />
+        <Control Id="ApiKeyEdit" Type="Edit" X="20" Y="140" Width="320" Height="18"
+                 Property="THREE_D_AI_STUDIO_API_KEY"
+                 Password="yes" />
+
+        <Control Id="ApiKeyHint" Type="Text" X="20" Y="162" Width="330" Height="28"
+                 Transparent="yes" NoPrefix="yes"
+                 Text="This value will be stored as a system environment variable during installation." />
 
         <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17"
                  Text="!(loc.WixUIBack)" />
@@ -134,12 +155,11 @@
                  Cancel="yes" Text="!(loc.WixUICancel)" />
       </Dialog>
 
-      <!-- First-time install flow -->
-      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="PortDlg" Condition="NOT Installed" />
-      <Publish Dialog="PortDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" />
-      <Publish Dialog="PortDlg" Control="Next" Event="NewDialog" Value="InstallDirDlg" />
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="ConfigDlg" Condition="NOT Installed" />
+      <Publish Dialog="ConfigDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" />
+      <Publish Dialog="ConfigDlg" Control="Next" Event="NewDialog" Value="InstallDirDlg" />
 
-      <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="PortDlg" Condition="NOT Installed" />
+      <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="ConfigDlg" Condition="NOT Installed" />
       <Publish Dialog="InstallDirDlg" Control="Next" Event="CheckTargetPath" Value="[WIXUI_INSTALLDIR]" Order="1" />
       <Publish Dialog="InstallDirDlg" Control="Next" Event="SetTargetPath" Value="[WIXUI_INSTALLDIR]" Order="3" />
       <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Order="4" />
@@ -152,7 +172,6 @@
 
       <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="InstallDirDlg" Order="1" Condition="NOT Installed" />
 
-      <!-- Maintenance flow -->
       <Publish Dialog="MaintenanceWelcomeDlg" Control="Next" Event="NewDialog" Value="MaintenanceTypeDlg" />
       <Publish Dialog="MaintenanceTypeDlg" Control="RepairButton" Event="NewDialog" Value="VerifyReadyDlg" />
       <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="VerifyReadyDlg" />

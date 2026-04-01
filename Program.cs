@@ -1,6 +1,5 @@
 using System.Net.Http.Headers;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using ThreeDAiStudioMcp.Clients;
 using ThreeDAiStudioMcp.Configuration;
@@ -8,6 +7,14 @@ using ThreeDAiStudioMcp.Hosting;
 using ThreeDAiStudioMcp.Tools;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseWindowsService();
+
+var port = ResolvePortFromArgs(args);
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.ListenAnyIP(port);
+});
 
 builder.Services
     .AddOptions<ThreeDAiStudioOptions>()
@@ -45,3 +52,15 @@ var app = builder.Build();
 app.MapMcp();
 
 app.Run();
+
+static int ResolvePortFromArgs(string[] args)
+{
+    for (int i = 0; i < args.Length - 1; i++)
+    {
+        if (args[i] == "--port" && int.TryParse(args[i + 1], out var port) && port > 0 && port <= 65535)
+        {
+            return port;
+        }
+    }
+    return ThreeDAiStudioOptions.DefaultPort;
+}

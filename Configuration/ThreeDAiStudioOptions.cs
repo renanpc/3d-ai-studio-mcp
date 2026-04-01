@@ -7,6 +7,7 @@ internal sealed class ThreeDAiStudioOptions
     public const string FailureLogPathEnvironmentVariable = "THREE_D_AI_STUDIO_FAILURE_LOG_PATH";
     public const string DefaultBaseUrl = "https://api.3daistudio.com";
     public const string DefaultFailureLogPath = "logs/three-d-ai-studio-api-failures.log";
+    public const int DefaultPort = 8080;
 
     public string? ApiKey { get; set; }
 
@@ -30,4 +31,5 @@ internal sealed class ThreeDAiStudioOptions
             ? value
             : Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, value));
     }
+
 }
