@@ -1,0 +1,16 @@
+<Project Sdk="Wix.NET.Sdk/6.0.2">
+
+  <PropertyGroup>
+    <ProductName>3D AI Studio MCP Server</ProductName>
+    <UpgradeCode>7E3F4A2C-8B1D-4F5E-9C3A-1B2D3E4F5A6B</UpgradeCode>
+    <Manufacturer>3D AI Studio</Manufacturer>
+    <Description>Remote MCP server for 3D AI Studio</Description>
+    <Copyright>Copyright 2025</Copyright>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ThreeDAiStudioMcp.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?define Name = "3D AI Studio MCP Server" ?>
+<?define Manufacturer = "3D AI Studio" ?>
+<?define UpgradeCode = "7E3F4A2C-8B1D-4F5E-9C3A-1B2D3E4F5A6B" ?>
+
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+
+    <Fragment>
+        <Property Id="HTTPPORT" Value="8080" />
+        <Property Id="INSTALLFOLDER" Value="[ProgramFiles64Folder]\$(Name)" />
+    </Fragment>
+
+    <Fragment>
+        <StandardDirectory Id="ProgramFiles64Folder">
+            <Directory Id="INSTALLFOLDER" Name="$(Name)">
+                <Component Id="SvcExec" Bitness="always64" Guid="E8A0C123-4567-89AB-CDEF-012345678901">
+                    <File Id="SvcExe" Source="$(var.SourcePath)\ThreeDAiStudioMcp.exe" KeyPath="yes" />
+                    <RemoveFile Id="CleanFiles" Name="*.*" On="both" />
+                    <ServiceInstall Id="SvcInstall" Type="ownProcess" Name="ThreeDAiStudioMcp"
+                                   DisplayName="$(Name)" Description="Remote MCP server for 3D AI Studio"
+                                   Start="auto" ErrorControl="normal"
+                                   Arguments="--port [HTTPPORT]" />
+                    <ServiceControl Id="SvcControl" Name="ThreeDAiStudioMcp"
+                                   Start="install" Stop="both" Remove="uninstall" Wait="yes" />
+                    <Environment Id="ApiKeyEnv" Name="THREE_D_AI_STUDIO_API_KEY"
+                                Value="[THREE_D_AI_STUDIO_API_KEY]" Action="set" System="yes" />
+                </Component>
+            </Directory>
+        </StandardDirectory>
+    </Fragment>
+
+    <Fragment>
+        <Component Id="RegComponent" Guid="F1B2C345-6789-0ABC-DEF1-234567890124" Directory="INSTALLFOLDER">
+            <RegistryValue Root="HKLM" Key="Software\ThreeDAiStudio\McpServer" Name="InstallPath"
+                          Type="string" Value="[INSTALLFOLDER]" />
+            <RegistryValue Root="HKLM" Key="Software\ThreeDAiStudio\McpServer" Name="HttpPort"
+                          Type="string" Value="[HTTPPORT]" />
+        </Component>
+    </Fragment>
+
+    <Fragment>
+        <UI>
+            <Dialog Id="SettingsDlg" Width="400" Height="280" Title="Service Settings">
+                <Control Id="TitleText" Type="Text" X="10" Y="5" Width="380" Height="20"
+                         Text="Service Configuration" />
+                <Control Id="DescText" Type="Text" X="10" Y="22" Width="380" Height="18"
+                         Text="Configure the service settings below." />
+
+                <Control Id="FolderLabel" Type="Text" X="10" Y="50" Width="380" Height="15"
+                         Text="Install folder:" />
+                <Control Id="FolderEdit" Type="PathEdit" X="10" Y="65" Width="300" Height="20"
+                         Property="INSTALLFOLDER" />
+                <Control Id="FolderBtn" Type="PushButton" X="315" Y="65" Width="75" Height="20"
+                         Text="Browse...">
+                    <Publish Event="SpawnDialog" Value="BrowseDlg" />
+                </Control>
+
+                <Control Id="PortLabel" Type="Text" X="10" Y="95" Width="380" Height="15"
+                         Text="HTTP Port (default: 8080):" />
+                <Control Id="PortEdit" Type="MaskedEdit" X="10" Y="110" Width="80" Height="20"
+                         Property="HTTPPORT" Text="8080" />
+
+                <Control Id="ApiKeyLabel" Type="Text" X="10" Y="140" Width="380" Height="15"
+                         Text="API Key (THREE_D_AI_STUDIO_API_KEY):" />
+                <Control Id="ApiKeyEdit" Type="PathEdit" X="10" Y="155" Width="380" Height="20"
+                         Property="THREE_D_AI_STUDIO_API_KEY" />
+
+                <Control Id="Line" Type="Line" X="10" Y="195" Width="380" Height="0" />
+
+                <Control Id="CancelBtn" Type="PushButton" X="220" Y="205" Width="75" Height="20"
+                         Text="Cancel">
+                    <Publish Event="SpawnDialog" Value="ExitDlg" />
+                </Control>
+                <Control Id="InstallBtn" Type="PushButton" X="305" Y="205" Width="75" Height="20"
+                         Default="yes" Text="Install">
+                    <Publish Event="EndDialog" Value="Return" />
+                </Control>
+            </Dialog>
+
+            <Dialog Id="BrowseDlg" Width="260" Height="100" Title="Browse for Folder">
+                <Control Id="PathEdit" Type="PathEdit" X="10" Y="10" Width="240" Height="20"
+                         Property="INSTALLFOLDER" />
+                <Control Id="OKBtn" Type="PushButton" X="95" Y="60" Width="70" Height="20"
+                         Default="yes" Text="OK">
+                    <Publish Event="EndDialog" Value="Return" />
+                </Control>
+                <Control Id="CancelBtn" Type="PushButton" X="170" Y="60" Width="70" Height="20"
+                         Text="Cancel">
+                    <Publish Event="EndDialog" Value="Return" />
+                </Control>
+            </Dialog>
+
+            <Dialog Id="ExitDlg" Width="240" Height="90" Title="Cancel Installation">
+                <Control Id="Text" Type="Text" X="20" Y="20" Width="200" Height="30"
+                         Text="Are you sure you want to cancel installation?" />
+                <Control Id="YesBtn" Type="PushButton" X="60" Y="55" Width="50" Height="20"
+                         Default="yes" Text="Yes">
+                    <Publish Event="ExitDialog" Value="Return" />
+                </Control>
+                <Control Id="NoBtn" Type="PushButton" X="115" Y="55" Width="50" Height="20"
+                         Text="No">
+                    <Publish Event="EndDialog" Value="Return" />
+                </Control>
+            </Dialog>
+
+            <InstallUISequence>
+                <Show Dialog="SettingsDlg" After="MigrateFeatureStates" />
+            </InstallUISequence>
+        </UI>
+    </Fragment>
+
+    <Package
+        Name="$(Name)"
+        Manufacturer="$(Manufacturer)"
+        Version="$(var.Version)"
+        UpgradeCode="$(var.UpgradeCode)"
+        Compressed="yes">
+
+        <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+        <MediaTemplate EmbedCab="yes" />
+
+        <Feature Id="Product" Title="3D AI Studio MCP Server" Level="1">
+            <ComponentRef Id="SvcExec" />
+            <ComponentRef Id="RegComponent" />
+        </Feature>
+
+    </Package>
+</Wix>

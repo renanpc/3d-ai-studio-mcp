@@ -11,6 +11,7 @@ permissions:
 env:
   PROJECT_PATH: ThreeDAiStudioMcp.csproj
   APP_NAME: ThreeDAiStudioMcp
+  WINX64_OUTPUT: ./publish/win-x64
 
 jobs:
   publish:
@@ -32,8 +33,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup .NET
+      - name: Setup .NET from global.json
         uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
 
       - name: Restore
         run: dotnet restore ${{ env.PROJECT_PATH }}
@@ -70,10 +73,59 @@ jobs:
             ${{ env.APP_NAME }}-${{ github.ref_name }}-${{ matrix.rid }}.tar.gz
           if-no-files-found: ignore
 
+  build-installer:
+    name: Build MSI Installer
+    runs-on: windows-latest
+    needs: publish
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET from global.json
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Download win-x64 publish artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: win-x64
+          path: ${{ env.WINX64_OUTPUT }}
+
+      - name: Extract publish artifact
+        shell: powershell
+        run: |
+          $zipPath = Get-ChildItem -Path "${{ env.WINX64_OUTPUT }}" -Filter "*.zip" | Select-Object -First 1
+          Expand-Archive -Path $zipPath.FullName -DestinationPath "${{ env.WINX64_OUTPUT }}" -Force
+          Remove-Item -Path $zipPath.FullName -Force
+
+      - name: Install WiX
+        shell: powershell
+        run: dotnet tool install -g wix --version 6.0.2
+
+      - name: Build MSI installer
+        id: build-msi
+        shell: powershell
+        run: |
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+          $msiName = "${{ env.APP_NAME }}-$version-win-x64.msi"
+          $sourcePath = [System.IO.Path]::GetFullPath("${{ env.WINX64_OUTPUT }}")
+          $packageWxs = [System.IO.Path]::GetFullPath("installer/Package.wxs")
+          Invoke-Expression "wix build -nologo -d SourcePath='$sourcePath' -d AppName='3D AI Studio MCP Server' -d Manufacturer='3D AI Studio' -d Version=$version -d UpgradeCode=7E3F4A2C-8B1D-4F5E-9C3A-1B2D3E4F5A6B -out '$msiName' '$packageWxs'"
+          Write-Output "msiName=$msiName" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Upload MSI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: msi-installer
+          path: ${{ steps.build-msi.outputs.msiName }}
+          if-no-files-found: error
+
   release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: publish
+    needs: [publish, build-installer]
 
     steps:
       - name: Checkout
@@ -87,7 +139,7 @@ jobs:
       - name: Create checksums
         shell: bash
         run: |
-          find ./release-assets -type f \( -name "*.zip" -o -name "*.tar.gz" \) -exec sha256sum {} \; > SHA256SUMS.txt
+          find ./release-assets -type f \( -name "*.zip" -o -name "*.tar.gz" -o -name "*.msi" \) -exec sha256sum {} \; > SHA256SUMS.txt
 
       - name: Create or update GitHub Release
         env:
