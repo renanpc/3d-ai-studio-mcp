@@ -86,7 +86,7 @@
                    Guid="D2C7B9A1-8E6F-4D61-95A0-4BC0E9C0D001"
                    Bitness="always64">
           <File Id="CodexSkillMd"
-                Source="$(var.SourcePath)\codex-skill\SKILL.md"
+                Source="$(sys.SOURCEFILEDIR)codex-skill\SKILL.md"
                 Name="SKILL.md" />
         </Component>
 
@@ -94,7 +94,7 @@
                    Guid="1A5B9D31-2B11-4A4A-9A52-20F6E6A31F10"
                    Bitness="always64">
           <File Id="RegisterMcpClientsPs1"
-                Source="$(var.SourcePath)\Register-McpClients.ps1" />
+                Source="$(sys.SOURCEFILEDIR)Register-McpClients.ps1" />
         </Component>
       </Directory>
     </StandardDirectory>
