@@ -4,7 +4,8 @@
 <?define Manufacturer = "3D AI Studio" ?>
 <?define UpgradeCode = "7E3F4A2C-8B1D-4F5E-9C3A-1B2D3E4F5A6B" ?>
 
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
 
   <Package
       Name="$(var.Name)"
@@ -16,24 +17,26 @@
 
     <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
     <MediaTemplate EmbedCab="yes" />
+    <Launch Condition="Privileged"
+            Message="[ProductName] must be installed from an elevated administrator session." />
 
-    <!-- InstallDir dialog uses this directory -->
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
-
-    <!-- User-editable properties -->
     <Property Id="HTTPPORT" Value="8080" />
     <Property Id="THREE_D_AI_STUDIO_API_KEY" Secure="yes" Hidden="yes" />
+    <Property Id="REGISTER_CLAUDE_CODE" Value="1" />
+    <Property Id="REGISTER_CODEX_MCP" Value="1" />
+    <Property Id="INSTALL_CODEX_SKILL" Value="1" />
+    <Property Id="MCP_SERVER_NAME" Value="3d-ai-studio" />
+    <Property Id="CODEX_SKILL_NAME" Value="3d-ai-studio-mcp" />
 
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="$(var.Name)">
         <Component Id="SvcExec"
                    Guid="E8A0C123-4567-89AB-CDEF-012345678901"
                    Bitness="always64">
-
           <File Id="SvcExe"
                 Source="$(var.SourcePath)\ThreeDAiStudioMcp.exe"
                 KeyPath="yes" />
-
           <ServiceInstall Id="SvcInstall"
                           Type="ownProcess"
                           Name="ThreeDAiStudioMcp"
@@ -43,21 +46,18 @@
                           ErrorControl="normal"
                           Account="NT AUTHORITY\LocalService"
                           Arguments="--port [HTTPPORT]" />
-
           <ServiceControl Id="SvcControl"
                           Name="ThreeDAiStudioMcp"
                           Start="install"
                           Stop="both"
                           Remove="uninstall"
-                          Wait="yes" />
+                          Wait="no" />
         </Component>
 
         <Component Id="EnvComponent"
                    Guid="8D8A4D5D-67C2-4D58-9B71-1A8E92D6E501"
                    Bitness="always64">
-
           <CreateFolder />
-
           <Environment Id="ApiKeyEnv"
                        Name="THREE_D_AI_STUDIO_API_KEY"
                        Value="[THREE_D_AI_STUDIO_API_KEY]"
@@ -69,19 +69,32 @@
         <Component Id="RegComponent"
                    Guid="F1B2C345-6789-0ABC-DEF1-234567890124"
                    Bitness="always64">
-
           <RegistryValue Root="HKLM"
                          Key="Software\ThreeDAiStudio\McpServer"
                          Name="InstallPath"
                          Type="string"
                          Value="[INSTALLFOLDER]"
                          KeyPath="yes" />
-
           <RegistryValue Root="HKLM"
                          Key="Software\ThreeDAiStudio\McpServer"
                          Name="HttpPort"
                          Type="string"
                          Value="[HTTPPORT]" />
+        </Component>
+
+        <Component Id="CodexSkillFiles"
+                   Guid="D2C7B9A1-8E6F-4D61-95A0-4BC0E9C0D001"
+                   Bitness="always64">
+          <File Id="CodexSkillMd"
+                Source="$(var.SourcePath)\codex-skill\SKILL.md"
+                Name="SKILL.md" />
+        </Component>
+
+        <Component Id="InstallerScripts"
+                   Guid="1A5B9D31-2B11-4A4A-9A52-20F6E6A31F10"
+                   Bitness="always64">
+          <File Id="RegisterMcpClientsPs1"
+                Source="$(var.SourcePath)\Register-McpClients.ps1" />
         </Component>
       </Directory>
     </StandardDirectory>
@@ -92,10 +105,32 @@
       <ComponentRef Id="SvcExec" />
       <ComponentRef Id="EnvComponent" />
       <ComponentRef Id="RegComponent" />
+      <ComponentRef Id="CodexSkillFiles" />
+      <ComponentRef Id="InstallerScripts" />
     </Feature>
 
-    <UI Id="Custom_InstallDir_WithConfig">
+    <SetProperty
+        Id="RegisterInstalledClients"
+        Sequence="execute"
+        Before="RegisterInstalledClients"
+        Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoLogo -NoProfile -ExecutionPolicy Bypass -File &quot;[#RegisterMcpClientsPs1]&quot; -ServerName &quot;[MCP_SERVER_NAME]&quot; -Port &quot;[HTTPPORT]&quot; -RegisterClaudeCode &quot;[REGISTER_CLAUDE_CODE]&quot; -RegisterCodexMcp &quot;[REGISTER_CODEX_MCP]&quot; -InstallCodexSkill &quot;[INSTALL_CODEX_SKILL]&quot; -CodexSkillName &quot;[CODEX_SKILL_NAME]&quot;" />
 
+    <CustomAction
+        Id="RegisterInstalledClients"
+        BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+        DllEntry="WixQuietExec"
+        Execute="deferred"
+        Impersonate="yes"
+        Return="ignore" />
+
+    <InstallExecuteSequence>
+      <Custom Action="RegisterInstalledClients"
+              After="StartServices"
+              Condition="NOT Installed AND NOT REMOVE~=&quot;ALL&quot; AND (REGISTER_CLAUDE_CODE=1 OR REGISTER_CODEX_MCP=1 OR INSTALL_CODEX_SKILL=1)" />
+    </InstallExecuteSequence>
+
+    <!-- UI -->
+    <UI Id="Custom_InstallDir_WithConfig">
       <TextStyle Id="WixUI_Font_Normal" FaceName="Tahoma" Size="8" />
       <TextStyle Id="WixUI_Font_Bigger" FaceName="Tahoma" Size="12" />
       <TextStyle Id="WixUI_Font_Title" FaceName="Tahoma" Size="9" Bold="yes" />
@@ -119,39 +154,49 @@
       <DialogRef Id="MaintenanceWelcomeDlg" />
       <DialogRef Id="MaintenanceTypeDlg" />
 
-      <Dialog Id="ConfigDlg" Width="370" Height="270" Title="[ProductName] Setup">
+      <Dialog Id="ConfigDlg" Width="370" Height="310" Title="[ProductName] Setup">
         <Control Id="Title" Type="Text" X="15" Y="6" Width="340" Height="15"
                  Transparent="yes" NoPrefix="yes"
                  Text="Service configuration" />
-
         <Control Id="Description" Type="Text" X="20" Y="23" Width="330" Height="28"
                  Transparent="yes" NoPrefix="yes"
-                 Text="Choose the HTTP port and API key for the 3D AI Studio MCP Server service." />
+                 Text="Choose the HTTP port, API key, and optional agent integrations." />
 
-        <Control Id="PortLabel" Type="Text" X="20" Y="70" Width="100" Height="15"
+        <Control Id="PortLabel" Type="Text" X="20" Y="60" Width="100" Height="15"
                  Text="HTTP port:" />
-        <Control Id="PortEdit" Type="Edit" X="125" Y="68" Width="90" Height="18"
+        <Control Id="PortEdit" Type="Edit" X="125" Y="58" Width="90" Height="18"
                  Property="HTTPPORT" Integer="yes" />
 
-        <Control Id="PortHint" Type="Text" X="20" Y="90" Width="300" Height="18"
-                 Transparent="yes" NoPrefix="yes"
-                 Text="Default: 8080" />
-
-        <Control Id="ApiKeyLabel" Type="Text" X="20" Y="122" Width="220" Height="15"
+        <Control Id="ApiKeyLabel" Type="Text" X="20" Y="92" Width="220" Height="15"
                  Text="THREE_D_AI_STUDIO_API_KEY:" />
-        <Control Id="ApiKeyEdit" Type="Edit" X="20" Y="140" Width="320" Height="18"
+        <Control Id="ApiKeyEdit" Type="Edit" X="20" Y="110" Width="320" Height="18"
                  Property="THREE_D_AI_STUDIO_API_KEY"
                  Password="yes" />
 
-        <Control Id="ApiKeyHint" Type="Text" X="20" Y="162" Width="330" Height="28"
-                 Transparent="yes" NoPrefix="yes"
-                 Text="This value will be stored as a system environment variable during installation." />
+        <Control Id="ClaudeCheckbox" Type="CheckBox" X="20" Y="150" Width="320" Height="18"
+                 Property="REGISTER_CLAUDE_CODE"
+                 CheckBoxValue="1"
+                 Text="Register this MCP server in Claude Code for the current user" />
 
-        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17"
+        <Control Id="CodexMcpCheckbox" Type="CheckBox" X="20" Y="172" Width="320" Height="18"
+                 Property="REGISTER_CODEX_MCP"
+                 CheckBoxValue="1"
+                 Text="Register this MCP server in Codex if the codex CLI is installed" />
+
+        <Control Id="CodexSkillCheckbox" Type="CheckBox" X="20" Y="194" Width="320" Height="18"
+                 Property="INSTALL_CODEX_SKILL"
+                 CheckBoxValue="1"
+                 Text="Install a Codex skill for 3D AI Studio if supported" />
+
+        <Control Id="Hint" Type="Text" X="20" Y="220" Width="330" Height="28"
+                 Transparent="yes" NoPrefix="yes"
+                 Text="Claude Code and Codex integration are per-user settings and run best-effort if those tools are detected." />
+
+        <Control Id="Back" Type="PushButton" X="180" Y="283" Width="56" Height="17"
                  Text="!(loc.WixUIBack)" />
-        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17"
+        <Control Id="Next" Type="PushButton" X="236" Y="283" Width="56" Height="17"
                  Default="yes" Text="!(loc.WixUINext)" />
-        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17"
+        <Control Id="Cancel" Type="PushButton" X="304" Y="283" Width="56" Height="17"
                  Cancel="yes" Text="!(loc.WixUICancel)" />
       </Dialog>
 
@@ -184,6 +229,5 @@
     </UI>
 
     <UIRef Id="WixUI_Common" />
-
   </Package>
 </Wix>

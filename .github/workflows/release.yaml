@@ -1,170 +1,155 @@
-<?xml version="1.0" encoding="UTF-8"?>
+name: Release
 
-<?define Name = "3D AI Studio MCP Server" ?>
-<?define Manufacturer = "3D AI Studio" ?>
-<?define UpgradeCode = "7E3F4A2C-8B1D-4F5E-9C3A-1B2D3E4F5A6B" ?>
+on:
+  push:
+    tags:
+      - "v*"
 
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+permissions:
+  contents: write
 
-  <Package
-      Name="$(var.Name)"
-      Manufacturer="$(var.Manufacturer)"
-      Version="$(var.Version)"
-      UpgradeCode="$(var.UpgradeCode)"
-      Scope="perMachine"
-      Compressed="yes">
+env:
+  PROJECT_PATH: ThreeDAiStudioMcp.csproj
+  APP_NAME: ThreeDAiStudioMcp
+  WINX64_OUTPUT: ./publish/win-x64
 
-    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
-    <MediaTemplate EmbedCab="yes" />
+jobs:
+  publish:
+    name: Publish ${{ matrix.rid }}
+    runs-on: ubuntu-latest
 
-    <!-- This tells the standard InstallDir dialog which directory id is editable -->
-    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+    strategy:
+      fail-fast: false
+      matrix:
+        rid:
+          - win-x64
+          - win-arm64
+          - osx-arm64
+          - linux-x64
+          - linux-arm64
+          - linux-musl-x64
 
-    <!-- Default port shown in the custom UI page -->
-    <Property Id="HTTPPORT" Value="8080" />
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    <StandardDirectory Id="ProgramFiles64Folder">
-      <Directory Id="INSTALLFOLDER" Name="$(var.Name)">
-        <Component Id="SvcExec"
-                   Guid="E8A0C123-4567-89AB-CDEF-012345678901"
-                   Bitness="always64">
+      - name: Setup .NET from global.json
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
 
-          <File Id="SvcExe"
-                Source="$(var.SourcePath)\ThreeDAiStudioMcp.exe"
-                KeyPath="yes" />
+      - name: Restore
+        run: dotnet restore ${{ env.PROJECT_PATH }}
 
-          <ServiceInstall Id="SvcInstall"
-                          Type="ownProcess"
-                          Name="ThreeDAiStudioMcp"
-                          DisplayName="$(var.Name)"
-                          Description="Remote MCP server for 3D AI Studio"
-                          Start="auto"
-                          ErrorControl="normal"
-                          Account="NT AUTHORITY\LocalService"
-                          Arguments="--port [HTTPPORT]" />
+      - name: Publish executable
+        run: >
+          dotnet publish ${{ env.PROJECT_PATH }}
+          -c Release
+          -r ${{ matrix.rid }}
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true
+          -p:DebugType=None
+          -p:DebugSymbols=false
+          --output ./publish/${{ matrix.rid }}
 
-          <ServiceControl Id="SvcControl"
-                          Name="ThreeDAiStudioMcp"
-                          Start="install"
-                          Stop="both"
-                          Remove="uninstall"
-                          Wait="yes" />
-        </Component>
-      </Directory>
-    </StandardDirectory>
+      - name: Package release asset
+        shell: bash
+        run: |
+          cd publish/${{ matrix.rid }}
+          if [[ "${{ matrix.rid }}" == win-* ]]; then
+            zip -r "../../${APP_NAME}-${GITHUB_REF_NAME}-${{ matrix.rid }}.zip" .
+          else
+            tar -czf "../../${APP_NAME}-${GITHUB_REF_NAME}-${{ matrix.rid }}.tar.gz" .
+          fi
 
-    <Component Id="RegComponent"
-               Guid="F1B2C345-6789-0ABC-DEF1-234567890124"
-               Directory="INSTALLFOLDER"
-               Bitness="always64">
+      - name: Upload packaged artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.rid }}
+          path: |
+            ${{ env.APP_NAME }}-${{ github.ref_name }}-${{ matrix.rid }}.zip
+            ${{ env.APP_NAME }}-${{ github.ref_name }}-${{ matrix.rid }}.tar.gz
+          if-no-files-found: ignore
 
-      <RegistryValue Root="HKLM"
-                     Key="Software\ThreeDAiStudio\McpServer"
-                     Name="InstallPath"
-                     Type="string"
-                     Value="[INSTALLFOLDER]"
-                     KeyPath="yes" />
+  build-installer:
+    name: Build MSI Installer
+    runs-on: windows-latest
+    needs: publish
 
-      <RegistryValue Root="HKLM"
-                     Key="Software\ThreeDAiStudio\McpServer"
-                     Name="HttpPort"
-                     Type="string"
-                     Value="[HTTPPORT]" />
-    </Component>
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    <Feature Id="Product"
-             Title="$(var.Name)"
-             Level="1">
-      <ComponentRef Id="SvcExec" />
-      <ComponentRef Id="RegComponent" />
-    </Feature>
+      - name: Setup .NET from global.json
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
 
-    <!-- Custom UI sequence with a Port dialog inserted before InstallDir -->
-    <UI Id="Custom_InstallDir_WithPort">
+      - name: Download win-x64 publish artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: win-x64
+          path: ${{ env.WINX64_OUTPUT }}
 
-      <TextStyle Id="WixUI_Font_Normal" FaceName="Tahoma" Size="8" />
-      <TextStyle Id="WixUI_Font_Bigger" FaceName="Tahoma" Size="12" />
-      <TextStyle Id="WixUI_Font_Title" FaceName="Tahoma" Size="9" Bold="yes" />
-      <Property Id="DefaultUIFont" Value="WixUI_Font_Normal" />
-      <Property Id="ARPNOMODIFY" Value="1" />
+      - name: Extract publish artifact
+        shell: powershell
+        run: |
+          $zipPath = Get-ChildItem -Path "${{ env.WINX64_OUTPUT }}" -Filter "*.zip" | Select-Object -First 1
+          Expand-Archive -Path $zipPath.FullName -DestinationPath "${{ env.WINX64_OUTPUT }}" -Force
+          Remove-Item -Path $zipPath.FullName -Force
 
-      <!-- Standard dialogs from the WiX UI extension -->
-      <DialogRef Id="BrowseDlg" />
-      <DialogRef Id="DiskCostDlg" />
-      <DialogRef Id="ErrorDlg" />
-      <DialogRef Id="ExitDialog" />
-      <DialogRef Id="FatalError" />
-      <DialogRef Id="FilesInUse" />
-      <DialogRef Id="MsiRMFilesInUse" />
-      <DialogRef Id="PrepareDlg" />
-      <DialogRef Id="ProgressDlg" />
-      <DialogRef Id="ResumeDlg" />
-      <DialogRef Id="UserExit" />
-      <DialogRef Id="WelcomeDlg" />
-      <DialogRef Id="InstallDirDlg" />
-      <DialogRef Id="VerifyReadyDlg" />
-      <DialogRef Id="MaintenanceWelcomeDlg" />
-      <DialogRef Id="MaintenanceTypeDlg" />
+      - name: Install WiX
+        shell: powershell
+        run: dotnet tool install -g wix --version 6.0.2 && wix extension add WixToolset.UI.wixext/6.0.2 && wix extension add WixToolset.Util.wixext/6.0.2
 
-      <!-- Custom port dialog -->
-      <Dialog Id="PortDlg" Width="370" Height="270" Title="[ProductName] Setup">
-        <Control Id="Title" Type="Text" X="15" Y="6" Width="340" Height="15"
-                 Transparent="yes" NoPrefix="yes"
-                 Text="Service configuration" />
+      - name: Build MSI installer
+        id: build-msi
+        shell: powershell
+        run: |
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+          $msiName = "${{ env.APP_NAME }}-$version-win-x64.msi"
+          $sourcePath = [System.IO.Path]::GetFullPath("${{ env.WINX64_OUTPUT }}")
+          $packageWxs = [System.IO.Path]::GetFullPath("installer/Package.wxs")
+          Invoke-Expression "wix build -nologo -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext -d SourcePath='$sourcePath' -d AppName='3D AI Studio MCP Server' -d Manufacturer='3D AI Studio' -d Version=$version -d UpgradeCode=7E3F4A2C-8B1D-4F5E-9C3A-1B2D3E4F5A6B -out '$msiName' '$packageWxs'"
+          Write-Output "msiName=$msiName" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
-        <Control Id="Description" Type="Text" X="20" Y="23" Width="330" Height="30"
-                 Transparent="yes" NoPrefix="yes"
-                 Text="Choose the HTTP port the 3D AI Studio MCP Server service will listen on." />
+      - name: Upload MSI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: msi-installer
+          path: ${{ steps.build-msi.outputs.msiName }}
+          if-no-files-found: error
 
-        <Control Id="PortLabel" Type="Text" X="20" Y="80" Width="80" Height="15"
-                 Text="HTTP port:" />
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [publish, build-installer]
 
-        <Control Id="PortEdit" Type="Edit" X="105" Y="78" Width="80" Height="18"
-                 Property="HTTPPORT" Integer="yes" />
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-        <Control Id="PortHint" Type="Text" X="20" Y="102" Width="300" Height="25"
-                 Transparent="yes" NoPrefix="yes"
-                 Text="Default is 8080. Example: 8080, 8081, 9000." />
+      - name: Download packaged artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./release-assets
 
-        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17"
-                 Text="!(loc.WixUIBack)" />
-        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17"
-                 Default="yes" Text="!(loc.WixUINext)" />
-        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17"
-                 Cancel="yes" Text="!(loc.WixUICancel)" />
-      </Dialog>
+      - name: Create checksums
+        shell: bash
+        run: |
+          find ./release-assets -type f \( -name "*.zip" -o -name "*.tar.gz" -o -name "*.msi" \) -exec sha256sum {} \; > SHA256SUMS.txt
 
-      <!-- First-time install flow -->
-      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="PortDlg" Condition="NOT Installed" />
-      <Publish Dialog="PortDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" />
-      <Publish Dialog="PortDlg" Control="Next" Event="NewDialog" Value="InstallDirDlg" />
-
-      <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="PortDlg" Condition="NOT Installed" />
-      <Publish Dialog="InstallDirDlg" Control="Next" Event="CheckTargetPath" Value="[WIXUI_INSTALLDIR]" Order="1" />
-      <Publish Dialog="InstallDirDlg" Control="Next" Event="SetTargetPath" Value="[WIXUI_INSTALLDIR]" Order="3" />
-      <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Order="4" />
-
-      <Publish Dialog="InstallDirDlg" Control="ChangeFolder" Property="_BrowseProperty" Value="[WIXUI_INSTALLDIR]" Order="1" />
-      <Publish Dialog="InstallDirDlg" Control="ChangeFolder" Event="SpawnDialog" Value="BrowseDlg" Order="2" />
-      <Publish Dialog="BrowseDlg" Control="OK" Event="CheckTargetPath" Value="[WIXUI_INSTALLDIR]" Order="1" />
-      <Publish Dialog="BrowseDlg" Control="OK" Event="SetTargetPath" Value="[_BrowseProperty]" Order="3" />
-      <Publish Dialog="BrowseDlg" Control="OK" Event="EndDialog" Value="Return" Order="4" />
-
-      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="InstallDirDlg" Order="1" Condition="NOT Installed" />
-
-      <!-- Maintenance flow -->
-      <Publish Dialog="MaintenanceWelcomeDlg" Control="Next" Event="NewDialog" Value="MaintenanceTypeDlg" />
-      <Publish Dialog="MaintenanceTypeDlg" Control="RepairButton" Event="NewDialog" Value="VerifyReadyDlg" />
-      <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="VerifyReadyDlg" />
-      <Publish Dialog="MaintenanceTypeDlg" Control="Back" Event="NewDialog" Value="MaintenanceWelcomeDlg" />
-      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Order="2" Condition="Installed AND NOT PATCH" />
-      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Condition="Installed AND PATCH" />
-      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="3" Condition="Installed AND PATCH" />
-
-      <Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="999" />
-    </UI>
-
-    <UIRef Id="WixUI_Common" />
-
-  </Package>
-</Wix>
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "${GITHUB_REF_NAME}" > /dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" ./release-assets/*/* --clobber
+          else
+            gh release create "${GITHUB_REF_NAME}" \
+              --generate-notes \
+              ./release-assets/*/* \
+              SHA256SUMS.txt
+          fi
