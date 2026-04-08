@@ -102,7 +102,11 @@ jobs:
 
       - name: Install WiX
         shell: powershell
-        run: dotnet tool install -g wix --version 6.0.2 && wix extension add WixToolset.UI.wixext/6.0.2 && wix extension add WixToolset.Util.wixext/6.0.2
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet tool install -g wix --version 6.0.2
+          wix extension add WixToolset.UI.wixext/6.0.2
+          wix extension add WixToolset.Util.wixext/6.0.2
 
       - name: Build MSI installer
         id: build-msi
