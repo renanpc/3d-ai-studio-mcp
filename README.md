@@ -38,11 +38,12 @@ Optional overrides:
 
 ```powershell
 $env:THREE_D_AI_STUDIO_BASE_URL = "https://api.3daistudio.com"
+$env:HTTP_PORT = "8080"
 $env:ASPNETCORE_URLS = "http://0.0.0.0:6281"
 $env:THREE_D_AI_STUDIO_FAILURE_LOG_PATH = "logs/three-d-ai-studio-api-failures.log"
 ```
 
-`THREE_D_AI_STUDIO_API_KEY` is required for live tool calls. `ASPNETCORE_URLS` is optional and lets you bind the remote MCP server to a custom interface or port. `THREE_D_AI_STUDIO_FAILURE_LOG_PATH` is optional and controls where failed upstream API calls are appended as text entries.
+`THREE_D_AI_STUDIO_API_KEY` is required for live tool calls. `HTTP_PORT` and `ASPNETCORE_URLS` are optional and let you bind the remote MCP server to a custom interface or port. `THREE_D_AI_STUDIO_FAILURE_LOG_PATH` is optional and controls where failed upstream API calls are appended as text entries.
 
 ## Build
 
@@ -62,6 +63,31 @@ By default, the launch profile exposes the MCP server at:
 ```text
 http://localhost:6281
 ```
+
+## Docker
+
+Build locally:
+
+```bash
+docker build -t renanpc/3d-ai-studio-mcp:local .
+```
+
+Run the container:
+
+```bash
+docker run --rm -p 8080:8080 \
+  -e THREE_D_AI_STUDIO_API_KEY=your-api-key \
+  -e THREE_D_AI_STUDIO_BASE_URL=https://api.3daistudio.com \
+  -e HTTP_PORT=8080 \
+  renanpc/3d-ai-studio-mcp:local
+```
+
+Container environment variables:
+
+- `THREE_D_AI_STUDIO_API_KEY` is required.
+- `THREE_D_AI_STUDIO_BASE_URL` is optional and defaults to `https://api.3daistudio.com`.
+- `THREE_D_AI_STUDIO_FAILURE_LOG_PATH` is optional.
+- `HTTP_PORT` is optional and defaults to `8080`.
 
 ## VS Code / Copilot configuration
 
