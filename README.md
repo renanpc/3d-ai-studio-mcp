@@ -72,6 +72,17 @@ Build locally:
 docker build -t renanpcf/3d-ai-studio-mcp:local .
 ```
 
+Use the latest public image from Docker Hub:
+
+```bash
+docker pull renanpcf/3d-ai-studio-mcp:latest
+docker run --rm -p 8080:8080 \
+  -e THREE_D_AI_STUDIO_API_KEY=your-api-key \
+  -e THREE_D_AI_STUDIO_BASE_URL=https://api.3daistudio.com \
+  -e HTTP_PORT=8080 \
+  renanpcf/3d-ai-studio-mcp:latest
+```
+
 Run the container:
 
 ```bash
