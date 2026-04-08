@@ -12,7 +12,7 @@ env:
   PROJECT_PATH: ThreeDAiStudioMcp.csproj
   APP_NAME: ThreeDAiStudioMcp
   WINX64_OUTPUT: ./publish/win-x64
-  DOCKER_IMAGE: renanpc/3d-ai-studio-mcp
+  DOCKER_IMAGE: renanpcf/3d-ai-studio-mcp
 
 jobs:
   publish:
