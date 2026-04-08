@@ -1,0 +1,12 @@
+.git
+.github
+.vs
+.wix
+bin
+obj
+publish
+installer/bin
+installer/obj
+*.msi
+*.wixpdb
+*.log

@@ -10,11 +10,14 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Host.UseWindowsService();
 
-var port = ResolvePortFromArgs(args);
-builder.WebHost.ConfigureKestrel(options =>
+if (!HasConfiguredUrls(builder.Configuration))
 {
-    options.ListenAnyIP(port);
-});
+    var port = ResolvePort(builder.Configuration);
+    builder.WebHost.ConfigureKestrel(options =>
+    {
+        options.ListenAnyIP(port);
+    });
+}
 
 builder.Services
     .AddOptions<ThreeDAiStudioOptions>()
@@ -53,14 +56,20 @@ app.MapMcp();
 
 app.Run();
 
-static int ResolvePortFromArgs(string[] args)
+static bool HasConfiguredUrls(IConfiguration configuration) =>
+    !string.IsNullOrWhiteSpace(configuration["urls"]) ||
+    !string.IsNullOrWhiteSpace(configuration["URLS"]) ||
+    !string.IsNullOrWhiteSpace(configuration["ASPNETCORE_URLS"]);
+
+static int ResolvePort(IConfiguration configuration)
 {
-    for (int i = 0; i < args.Length - 1; i++)
+    foreach (var key in new[] { "HTTP_PORT", "PORT", "port" })
     {
-        if (args[i] == "--port" && int.TryParse(args[i + 1], out var port) && port > 0 && port <= 65535)
+        if (int.TryParse(configuration[key], out var port) && port > 0 && port <= 65535)
         {
             return port;
         }
     }
+
     return ThreeDAiStudioOptions.DefaultPort;
 }
