@@ -100,6 +100,10 @@ Container environment variables:
 - `THREE_D_AI_STUDIO_FAILURE_LOG_PATH` is optional.
 - `HTTP_PORT` is optional and defaults to `8080`.
 
+## Disclaimer
+
+This project is provided as a developer and integration tool. It is used at your own risk, and you are responsible for reviewing generated outputs, prompts, referenced assets, and downstream usage before relying on them in production workflows.
+
 ## VS Code / Copilot configuration
 
 For remote HTTP mode, Copilot does not start the server for you. Run the server separately, then point `.vscode/mcp.json` at the URL:
