@@ -69,7 +69,7 @@ http://localhost:6281
 Build locally:
 
 ```bash
-docker build -t renanpc/3d-ai-studio-mcp:local .
+docker build -t renanpcf/3d-ai-studio-mcp:local .
 ```
 
 Run the container:
@@ -79,7 +79,7 @@ docker run --rm -p 8080:8080 \
   -e THREE_D_AI_STUDIO_API_KEY=your-api-key \
   -e THREE_D_AI_STUDIO_BASE_URL=https://api.3daistudio.com \
   -e HTTP_PORT=8080 \
-  renanpc/3d-ai-studio-mcp:local
+  renanpcf/3d-ai-studio-mcp:local
 ```
 
 Container environment variables:
